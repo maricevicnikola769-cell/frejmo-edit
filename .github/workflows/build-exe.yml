@@ -1,0 +1,46 @@
+name: Napravi EXE
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  IME_PROGRAMA: "LocalSiteCMS"
+  PROZOR: "da"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instaliraj biblioteke
+        run: |
+          python -m pip install --upgrade pip pyinstaller
+          if (Test-Path python/requirements.txt) { python -m pip install -r python/requirements.txt }
+
+      - name: Napravi EXE
+        run: |
+          $opcije = @("--onefile", "--name", "$env:IME_PROGRAMA")
+          if ($env:PROZOR -eq "da") { $opcije += "--windowed" }
+          if (Test-Path python/icon.ico) { $opcije += @("--icon", "python/icon.ico", "--add-data", "python/icon.ico;.") }
+          pyinstaller @opcije python/main.py
+
+      - name: Napravi instalaciju
+        run: |
+          choco install innosetup -y --no-progress
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppName=$env:IME_PROGRAMA" "/DAppVersion=1.${{ github.run_number }}" installer.iss
+
+      - name: Objavi u Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: exe-${{ github.run_number }}
+          name: Verzija ${{ github.run_number }}
+          files: dist/*.exe
